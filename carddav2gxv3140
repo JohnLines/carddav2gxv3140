@@ -1,0 +1,177 @@
+#!/usr/bin/perl
+#
+# Get all the addresses which are marked as Phone Book out of CardDAV
+#  - This version uses khard to do all the CardDAV stuff
+#
+#  Copyright John Lines (john+carddav2gxv3140@paladyn.org) September 2019
+#
+# This program is released under the terms of the GNU Public Licence
+
+
+use vCard::AddressBook;
+use Data::Dumper;
+
+use File::HomeDir;
+
+my $contacts = vCard::AddressBook->new();
+
+#### `pc_query -A | grep -v "searching for ..."  >$tmpfile` ;
+
+$data_dir = File::HomeDir->my_home . "/.local/share/carddav2gxv3140";
+
+if (! -d $data_dir ) {
+	mkdir($data_dir) or die "Cant create $data_dir";
+}
+
+$tmpfile="/tmp/carddav2gxv3140.tmp";
+`khard phone  >$tmpfile` ;
+
+# For simplicity work with a very small tmpfile, in the current dir
+# $tmpfile="carddav2gxv3140.tmp";
+
+ $outfile="$data_dir/carddav-phonebook.xml";
+
+ $masterfile="/var/www/html/phonebook.xml";
+
+# Test for outfile and masterfile (should check they both exist) being different at the start.
+# If they are then send an email and exit - no point in keep generating new phone books
+
+ if ( -e $outfile && -e $masterfile ) {
+ my $cmpresult = `cmp -s $outfile $masterfile`;
+ if ( $? ) {
+	 print "Files differ at the start - exiting\n";
+	 exit;
+ }
+}
+
+
+sub parse_vcards {
+# Read the contacts, and put them into structures
+
+open (TMPFILE, $tmpfile);
+
+ my $vcard = $contacts->add_vcard;
+
+ while ( $line = <TMPFILE> ) {
+   chomp $line;
+   if ($line eq "") { 
+       print "Starting a new vcard - old card was " . Dumper($vcard) . "\n";
+
+
+       my $vcard = $contacts->add_vcard;
+      } else {
+     my ($label, $value) = split(/:/,$line);
+     if ( $label eq "Name" ) {
+         print "Name is $value \n";
+         $vcard->full_name($value);
+         print "Have set full name to " . $vcard->full_name() . "\n";
+     } elsif ( $label eq "CATEGORIES" ) {
+#          $vcard->categories($value);
+# This is very much a fudge - use timezone field for categories
+         $vcard->timezone($value); 
+        
+     } 
+     }
+   print "xxx" . $line . "\n" ;
+
+   }
+
+}
+
+# everything is read in - the reason for doing it this way was to be able to
+# process the entries, for example to tie together people who are differnt contacts,
+# but have the same landline number.
+
+# Now in this version I wont worry about generating an intermediate file, and will just
+# process khard data
+
+open(my $out, '>', $outfile) or die "could not open output file $outfile";
+
+print $out "<?xml version=\"1.0\"?>\n<AddressBook>\n<version>1</version>\n";
+
+
+
+sub process_vcards {
+# foreach my $vcardx (@{ $contacts->vcards() }) {
+foreach my $vcardx ( $contacts->vcards() ) {
+    print "Next vcard " . Dumper($vcardx). "\n";
+    print "Full name ->" . $vcardx->full_name() . "\n";
+#    print $vcard->email_addresses->[0]->{address} . "\n";
+
+
+}
+}
+ 
+sub process_khard {
+
+open (TMPFILE, $tmpfile);
+
+my $oldname = "";
+my $accountindex = 0;
+my $in_contact = 0;
+
+# The first line is a header - ignore it
+ $line = <TMPFILE>;
+
+ while ( $line = <TMPFILE> ) {
+   chomp $line;
+
+   my ($name, $phonetype, $number) = unpack("A36 A26 A18", $line);
+
+   if ( $oldname eq "") { $oldname = $name } ;
+   my ($forename, $surname) = split(' ',$name,2);
+   #   print "Name $forename, $surname type $phonetype number $number\n" ;
+
+   if ( $name ne $oldname ) {
+	   #	   print "Different name $name from $oldname\n";
+	   if ( $in_contact ) {
+		   print $out "</Contact>\n";
+		   $in_contact = 0;
+	   }
+   print $out "<Contact>\n<FirstName>$forename</FirstName>\n<LastName>$surname</LastName>\n";
+   $in_contact = 1;
+   print $out "<Phone><phonenumber>$number</phonenumber>\n";
+   print $out "<accountindex>0</accountindex>\n";
+   print $out "</Phone>\n";
+   #   print $out "</Contact>\n";
+   $oldname = $name ;
+   } else {
+	   #	   print "Duplicate name $name \n";
+	   if ( not $in_contact ) {     # Deal with very first entry
+	      print $out "<Contact>\n<FirstName>$forename</FirstName>\n<LastName>$surname</LastName>\n";
+              $in_contact = 1;
+      }
+   print $out "<Phone><phonenumber>$number</phonenumber>\n";
+   print $out "<accountindex>0</accountindex>\n";
+   print $out "</Phone>\n";
+   #   print $out "</Contact>\n";
+   }
+
+   }
+
+	   if ( $in_contact ) {
+		   print $out "</Contact>\n";
+		   $in_contact = 0;
+	   }
+
+
+}
+
+
+&process_khard;
+
+
+
+print $out "</AddressBook>\n";
+
+close $out;
+
+ my $diffout = "/tmp/carddav2gsv3140.diff";
+
+ my $diffresult = `diff  $outfile $masterfile > $diffout`;
+ if ( $? ) {
+	 print "Files differ at the end \n";
+	 exit;
+ }
+
+ system("/bin/rm -f $diffout");
