@@ -120,6 +120,7 @@ my $in_contact = 0;
 
    if ( $oldname eq "") { $oldname = $name } ;
    my ($forename, $surname) = split(' ',$name,2);
+   $number =~ s/\s+//g;
    #   print "Name $forename, $surname type $phonetype number $number\n" ;
 
    if ( $name ne $oldname ) {
@@ -166,11 +167,12 @@ print $out "</AddressBook>\n";
 
 close $out;
 
- my $diffout = "/tmp/carddav2gsv3140.diff";
+ my $diffout = "/tmp/carddav2gxv3140.diff";
 
  my $diffresult = `diff  $outfile $masterfile > $diffout`;
  if ( $? ) {
 	 print "Files differ at the end \n";
+	 system("cat $diffout");
 	 exit;
  }
 
