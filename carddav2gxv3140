@@ -121,6 +121,9 @@ my $in_contact = 0;
    if ( $oldname eq "") { $oldname = $name } ;
    my ($forename, $surname) = split(' ',$name,2);
    $number =~ s/\s+//g;
+   # If the number contains +44 in the carddav address book it will probably show as a leading 0
+   # on the phone, swap it
+   $number =~ s/\+44/0/;
    #   print "Name $forename, $surname type $phonetype number $number\n" ;
 
    if ( $name ne $oldname ) {
