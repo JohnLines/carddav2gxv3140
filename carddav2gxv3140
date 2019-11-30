@@ -6,18 +6,54 @@
 #  Copyright John Lines (john+carddav2gxv3140@paladyn.org) September 2019
 #
 # This program is released under the terms of the GNU Public Licence
+#
+# Usage
+#   cardav2gxv3150
+#  use generate the phonebook from CardDAV and compare it to the version
+#   being used for the phone
+#
+#   carddav2gxv3140 -c
+#  Compare the differences and show them on the terminal
+#
+#   carddav2gxv3140 -u
+#  Update the live phone book source with the new version
+#
 
-
+use Getopt::Std;
 use vCard::AddressBook;
 use Data::Dumper;
 
 use File::HomeDir;
+
+our($opt_c, $opt_u, $opt_h);
 
 my $contacts = vCard::AddressBook->new();
 
 #### `pc_query -A | grep -v "searching for ..."  >$tmpfile` ;
 
 $data_dir = File::HomeDir->my_home . "/.local/share/carddav2gxv3140";
+
+getopts('cuh');
+
+if ( $opt_h) {
+	print "Usage
+	  
+   cardav2gxv3150
+  used  with no arguments to generate the phonebook from CardDAV
+  and compare it to the version being used for the phone
+
+   carddav2gxv3140 -c
+  Compare the differences and show them on the terminal
+
+   carddav2gxv3140 -u
+  Update the live phone book source with the new version
+
+";
+  exit;
+  }
+
+
+
 
 if (! -d $data_dir ) {
 	mkdir($data_dir) or die "Cant create $data_dir";
@@ -32,6 +68,10 @@ $tmpfile="/tmp/carddav2gxv3140.tmp";
  $outfile="$data_dir/carddav-phonebook.xml";
 
  $masterfile="/var/www/html/phonebook.xml";
+
+if ( $opt_c ) { &print_diffs ; exit; }
+
+if ( $opt_u) { &update_master ; exit; }
 
 # Test for outfile and masterfile (should check they both exist) being different at the start.
 # If they are then send an email and exit - no point in keep generating new phone books
@@ -170,8 +210,13 @@ print $out "</AddressBook>\n";
 
 close $out;
 
+&print_diffs;
+
+sub print_diffs {
+
  my $diffout = "/tmp/carddav2gxv3140.diff";
 
+#  print "in print_diffs - outfile is $outfile, masterfile is $masterfile\n";
  my $diffresult = `diff  $outfile $masterfile > $diffout`;
  if ( $? ) {
 	 print "Files differ at the end \n";
@@ -180,3 +225,11 @@ close $out;
  }
 
  system("/bin/rm -f $diffout");
+}
+
+
+sub update_master {
+
+	# print "update_master - copy $outfile to $masterfile";	
+	system ("cp $outfile $masterfile");
+}

@@ -9,7 +9,7 @@ address books you use, such that 'khard phone' will give you
 a list of people and phone numbers.
 
 The phone numbers are extracted and converted and stored in
-~/.local/share/carddav2html/carddav-phonebook.xml
+~/.local/share/carddav2gxv3140/carddav-phonebook.xml
 
 This is compared with the master file at
 /var/www/html/phonebook.xml
@@ -19,4 +19,6 @@ differences, and does not update the master file.
 
 If the differences are valid then the created file should
 be manually copied to the master file.
+
+Homepage: https://github.com/JohnLines/carddav2gxv3140
 
